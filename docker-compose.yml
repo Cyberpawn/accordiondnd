@@ -1,0 +1,49 @@
+version: '3.6'
+services:
+#maven : Maven uses the source program file and POM file to create a WAR file in target folder.
+  maven:
+    labels:
+      - "meyyazhakan.selvaraj@esc20.net" 
+    image: maven:3.6.0-jdk-11-slim
+    volumes:
+    - .:/usr/src/app
+    working_dir: /usr/src/app
+    command: bash -c 'mvn install'
+    
+#unity: Tomcat server 8.5.30.Tomcat uses maven generated WAR file.Tomcat runs in docker localhost:8080.
+  unity:
+    labels:
+      - "meyyazhakan.selvaraj@esc20.net"           
+    build:
+      context: .
+      dockerfile: tomcat-dockerfile.dockerfile
+    volumes:
+    - ./target:/usr/local/tomcat/webapps
+    command: bash -c 'while ping -c1 maven; do sleep 1;done; echo "Maven process completed" && export JPDA_ADDRESS=8000
+       && export JPDA_TRANSPORT=dt_socket &&./bin/catalina.sh jpda start && tail -f logs/catalina.out'
+    ports:
+     - "18000:8000"
+    
+ #Nginx : Nginx-config folder and nginx-dockerfile.dockerfile is required to build it.It establish connection with service unity.Ngnix runs in windows localhost:80.
+  web:
+    labels:
+      - "Eimad.Zamrik@esc20.net"
+    depends_on:
+      - "maven"
+      - "unity"
+    build:
+      context: .
+      dockerfile: nginx-dockerfile.dockerfile
+    command: bash -c 'while ping -c1 maven; do sleep 1;done; echo "Maven process completed" && nginx -g "daemon off;"'
+    ports:
+     - "80:80"
+     
+#sybase: Database is downloaded from docker hub and connected to windows port 12638.
+  sybase:
+    labels:
+      - "Eimad.Zamrik@esc20.net"  
+    image: teambigo/cafebigo_sybase:latest    
+    command: bash -c '. /opt/sqlanywhere17/bin64/sa_config.sh && dbspawn -f dbsrv17 -n txeisdb /usr/local/sybase/databases/DB020020.db && tail -f /dev/null'
+    ports:
+     - "12638:2638"
+    restart: always
